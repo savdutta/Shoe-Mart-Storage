@@ -1,34 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Product } from '../types';
-import { PRODUCT_CATEGORIES, VARIANT_OPTIONS } from '../utils/constants';
-import { calculateTotalStock, formatCurrency } from '../utils/helpers';
+import { X, Package, BarChart3, DollarSign } from 'lucide-react';
+import { Product, ProductFormData } from '../types';
+import { PRODUCT_TYPES, VARIANT_OPTIONS, PRODUCT_CATEGORIES } from '../utils/constants';
 
 interface AddEditProductProps {
-  product: Product | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (productData: Omit<Product, 'id' | 'totalStock' | 'timesSold' | 'revenueGenerated' | 'lastSale' | 'createdAt'>) => void;
-  onUpdate: (id: number, updates: Partial<Product>) => void;
+  onSave: (product: ProductFormData) => void;
+  product?: Product | null;
 }
 
-const AddEditProduct: React.FC<AddEditProductProps> = ({ 
-  product, 
-  isOpen, 
-  onClose, 
-  onSave, 
-  onUpdate 
-}) => {
-  const [activeSection, setActiveSection] = useState('basic');
-  const [formData, setFormData] = useState({
-    productType: 'shoes' as Product['productType'],
+export default function AddEditProduct({ isOpen, onClose, onSave, product }: AddEditProductProps) {
+  const [activeTab, setActiveTab] = useState('basic');
+  const [formData, setFormData] = useState<ProductFormData>({
+    productType: 'shoes',
     name: '',
     articleNumber: '',
     category: '',
     color: '',
     brand: '',
-    variants: {} as Record<string, number>,
+    variants: {},
     buyingPrice: 0,
     sellingPrice: 0,
+    totalStock: 0
   });
 
   useEffect(() => {
@@ -36,375 +30,448 @@ const AddEditProduct: React.FC<AddEditProductProps> = ({
       setFormData({
         productType: product.productType,
         name: product.name,
-        articleNumber: product.articleNumber,
+        articleNumber: product.articleNumber || '',
         category: product.category,
         color: product.color,
         brand: product.brand,
-        variants: { ...product.variants },
-        buyingPrice: product.buyingPrice,
-        sellingPrice: product.sellingPrice,
+        variants: product.variants,
+        buyingPrice: Number(product.buyingPrice),
+        sellingPrice: Number(product.sellingPrice),
+        totalStock: product.totalStock
       });
     } else {
       setFormData({
         productType: 'shoes',
         name: '',
         articleNumber: '',
-        category: PRODUCT_CATEGORIES.shoes[0],
+        category: '',
         color: '',
         brand: '',
         variants: {},
         buyingPrice: 0,
         sellingPrice: 0,
+        totalStock: 0
       });
     }
-    setActiveSection('basic');
   }, [product, isOpen]);
 
-  // Update category when product type changes
-  useEffect(() => {
-    if (!product) {
-      const categories = PRODUCT_CATEGORIES[formData.productType];
-      setFormData(prev => ({
-        ...prev,
-        category: categories[0],
-        variants: {}
-      }));
-    }
-  }, [formData.productType, product]);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
 
-  const handleVariantChange = (variant: string, quantity: number) => {
+  const handleVariantChange = (size: string, stock: number) => {
     setFormData(prev => ({
       ...prev,
       variants: {
         ...prev.variants,
-        [variant]: Math.max(0, quantity)
+        [size]: stock
       }
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (product) {
-      onUpdate(product.id, formData);
-    } else {
-      onSave(formData);
-    }
-    onClose();
+  const calculateTotalStock = () => {
+    const total = Object.values(formData.variants).reduce((sum, stock) => sum + (Number(stock) || 0), 0);
+    setFormData(prev => ({ ...prev, totalStock: total }));
   };
 
-  const totalStock = calculateTotalStock(formData.variants);
-  const profitPerUnit = formData.sellingPrice - formData.buyingPrice;
-  const profitMargin = formData.sellingPrice > 0 ? (profitPerUnit / formData.sellingPrice) * 100 : 0;
+  useEffect(() => {
+    calculateTotalStock();
+  }, [formData.variants]);
 
-  // Form validation logic
-  const isBasicDetailsComplete = formData.name && 
-    (formData.productType !== 'shoes' || formData.articleNumber) && // Article number only required for shoes
-    formData.color && 
-    formData.brand;
-  
-  const isVariantsComplete = totalStock > 0;
-  
-  const isPricingComplete = formData.buyingPrice > 0 && formData.sellingPrice > 0;
-  
-  const isFormValid = isBasicDetailsComplete && isVariantsComplete && isPricingComplete;
-  
+  // Validation functions
+  const isBasicDetailsValid = () => {
+    return formData.productType && 
+           formData.name.trim() && 
+           formData.category && 
+           formData.color.trim() && 
+           formData.brand.trim();
+  };
+
+  const isStockVariantsValid = () => {
+    if (formData.productType === 'bags') {
+      return formData.totalStock > 0;
+    }
+    return formData.totalStock > 0 && Object.keys(formData.variants).length > 0;
+  };
+
+  const isPricingValid = () => {
+    return formData.buyingPrice > 0 && formData.sellingPrice > 0;
+  };
+
+  const isFormValid = () => {
+    return isBasicDetailsValid() && isStockVariantsValid() && isPricingValid();
+  };
+
+  const getVariantLabel = () => {
+    if (formData.productType === 'shoes') return 'Size';
+    if (formData.productType === 'belts') return 'Size';
+    if (formData.productType === 'socks') return 'Size';
+    return 'Variant';
+  };
+
+  const getSizeOptions = () => {
+    if (formData.productType === 'shoes') {
+      switch (formData.category) {
+        case 'Ladies Shoes':
+          return VARIANT_OPTIONS.shoes['Ladies Shoes'] || [];
+        case 'Gents Shoes':
+          return VARIANT_OPTIONS.shoes['Gents Shoes'] || [];
+        case 'Kids Shoes':
+          return VARIANT_OPTIONS.shoes['Kids Shoes'] || [];
+        default:
+          return [];
+      }
+    } else if (formData.productType === 'socks') {
+      return VARIANT_OPTIONS.socks || [];
+    } else if (formData.productType === 'belts') {
+      return VARIANT_OPTIONS.belts || [];
+    } else if (formData.productType === 'bags') {
+      return VARIANT_OPTIONS.bags || [];
+    }
+    
+    return [];
+  };
+
   if (!isOpen) return null;
-
-  const sections = [
-    { id: 'basic', label: 'Basic Details', icon: '📝', completed: isBasicDetailsComplete },
-    { id: 'variants', label: 'Stock & Variants', icon: '📦', completed: isVariantsComplete },
-    { id: 'pricing', label: 'Pricing', icon: '💰', completed: isPricingComplete },
-  ];
-
-  const renderBasicDetails = () => (
-    <div className="space-y-4">
-      {!product && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Product Type
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            {Object.keys(PRODUCT_CATEGORIES).map((type) => (
-              <label
-                key={type}
-                className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                  formData.productType === type
-                    ? 'border-purple-500 bg-purple-50'
-                    : 'border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="productType"
-                  value={type}
-                  checked={formData.productType === type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, productType: e.target.value as Product['productType'] }))}
-                  className="sr-only"
-                />
-                <span className="mr-2 text-xl">
-                  {type === 'shoes' ? '👟' : type === 'socks' ? '🧦' : type === 'bags' ? '👜' : '👔'}
-                </span>
-                <span className="font-medium capitalize">{type}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Product Name *
-          </label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            placeholder="e.g., Paragon Sport Shoes"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Article Number {formData.productType === 'shoes' ? '*' : '(Optional)'}
-          </label>
-          <input
-            type="text"
-            value={formData.articleNumber}
-            onChange={(e) => setFormData(prev => ({ ...prev, articleNumber: e.target.value }))}
-            placeholder="e.g., PGN-9230"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required={formData.productType === 'shoes'}
-          />
-          {formData.productType !== 'shoes' && (
-            <p className="text-xs text-gray-500 mt-1">Article number is optional for this product type</p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Category *
-          </label>
-          <select
-            value={formData.category}
-            onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500"
-            required
-          >
-            {PRODUCT_CATEGORIES[formData.productType].map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Color *
-          </label>
-          <input
-            type="text"
-            value={formData.color}
-            onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-            placeholder="e.g., Black, White, Blue"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Brand *
-          </label>
-          <input
-            type="text"
-            value={formData.brand}
-            onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
-            placeholder="e.g., Nike, Adidas, Paragon"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderVariants = () => (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          {formData.productType === 'shoes' ? 'Size Inventory' : 'Variant Inventory'}
-        </h3>
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {(formData.productType === 'shoes' 
-            ? VARIANT_OPTIONS.shoes[formData.category] || []
-            : VARIANT_OPTIONS[formData.productType]
-          ).map((variant) => (
-            <div key={variant}>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                {variant}
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.variants[variant] || 0}
-                onChange={(e) => handleVariantChange(variant, parseInt(e.target.value) || 0)}
-                className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {totalStock > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h4 className="font-medium text-green-800 mb-2">Stock Summary</h4>
-          <p className="text-green-700">
-            <span className="font-semibold">Total Stock: {totalStock} pieces</span>
-          </p>
-          <div className="text-sm text-green-600 mt-1">
-            {Object.entries(formData.variants)
-              .filter(([_, quantity]) => quantity > 0)
-              .map(([variant, quantity]) => `${variant}(${quantity})`)
-              .join(', ')}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderPricing = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Buying Price (₹) *
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.buyingPrice || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, buyingPrice: parseFloat(e.target.value) || 0 }))}
-            placeholder="800"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Selling Price (₹) *
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.sellingPrice || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, sellingPrice: parseFloat(e.target.value) || 0 }))}
-            placeholder="1200"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            required
-          />
-        </div>
-      </div>
-
-      {formData.buyingPrice > 0 && formData.sellingPrice > 0 && (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <h4 className="font-medium text-purple-800 mb-2">Profit Analysis</h4>
-          <div className="space-y-1 text-purple-700">
-            <p>
-              <span className="font-medium">Profit per Unit:</span> {formatCurrency(profitPerUnit)}
-            </p>
-            <p>
-              <span className="font-medium">Profit Margin:</span> {profitMargin.toFixed(1)}%
-            </p>
-            {totalStock > 0 && (
-              <p>
-                <span className="font-medium">Potential Total Profit:</span> {formatCurrency(profitPerUnit * totalStock)}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        {/* Header */}
+      <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold">
             {product ? 'Edit Product' : 'Add New Product'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex">
-          {/* Sidebar Navigation */}
-          <div className="w-64 bg-gray-50 p-4 border-r">
-            <nav className="space-y-1">
-              {sections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => setActiveSection(section.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-left rounded-md transition-colors ${
-                    activeSection === section.id
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <span className="mr-3">{section.icon}</span>
-                    {section.label}
-                  </div>
-                  {section.completed && (
-                    <span className="text-green-500 text-sm">✓</span>
-                  )}
-                </button>
-              ))}
-            </nav>
+        <div className="flex flex-col lg:flex-row h-full max-h-[calc(90vh-80px)]">
+          {/* Navigation Tabs */}
+          <div className="lg:w-64 border-b lg:border-b-0 lg:border-r bg-gray-50">
+            <div className="flex lg:flex-col overflow-x-auto lg:overflow-x-visible">
+              <button
+                onClick={() => setActiveTab('basic')}
+                className={`flex items-center gap-3 px-4 py-3 text-left whitespace-nowrap lg:whitespace-normal transition-colors ${
+                  activeTab === 'basic'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Package className="w-5 h-5 flex-shrink-0" />
+                <span className="hidden sm:inline">Basic Details</span>
+                {isBasicDetailsValid() && <span className="text-green-400">✓</span>}
+              </button>
+              <button
+                onClick={() => setActiveTab('variants')}
+                className={`flex items-center gap-3 px-4 py-3 text-left whitespace-nowrap lg:whitespace-normal transition-colors ${
+                  activeTab === 'variants'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <BarChart3 className="w-5 h-5 flex-shrink-0" />
+                <span className="hidden sm:inline">Stock & Variants</span>
+                {isStockVariantsValid() && <span className="text-green-400">✓</span>}
+              </button>
+              <button
+                onClick={() => setActiveTab('pricing')}
+                className={`flex items-center gap-3 px-4 py-3 text-left whitespace-nowrap lg:whitespace-normal transition-colors ${
+                  activeTab === 'pricing'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <DollarSign className="w-5 h-5 flex-shrink-0" />
+                <span className="hidden sm:inline">Pricing</span>
+                {isPricingValid() && <span className="text-green-400">✓</span>}
+              </button>
+            </div>
           </div>
 
-          {/* Form Content */}
-          <div className="flex-1 p-6 overflow-y-auto">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {activeSection === 'basic' && renderBasicDetails()}
-              {activeSection === 'variants' && renderVariants()}
-              {activeSection === 'pricing' && renderPricing()}
+          {/* Content Area */}
+          <div className="flex-1 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-6">
+              {activeTab === 'basic' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Product Type *
+                      </label>
+                      <select
+                        value={formData.productType}
+                        onChange={(e) => setFormData(prev => ({ ...prev, productType: e.target.value as any }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        required
+                      >
+                        {PRODUCT_TYPES.map(type => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-              {/* Form Actions */}
-              <div className="flex justify-end space-x-4 pt-6 border-t">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Product Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Article Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.articleNumber}
+                        onChange={(e) => setFormData(prev => ({ ...prev, articleNumber: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Category *
+                      </label>
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        required
+                      >
+                        <option value="">Select Category</option>
+                        {formData.productType === 'shoes' && (
+                          <>
+                            <option value="Ladies Shoes">Ladies Shoes</option>
+                            <option value="Gents Shoes">Gents Shoes</option>
+                            <option value="Kids Shoes">Kids Shoes</option>
+                          </>
+                        )}
+                        {formData.productType === 'socks' && (
+                          <>
+                            <option value="Gents Socks">Gents Socks</option>
+                            <option value="Ladies Socks">Ladies Socks</option>
+                            <option value="Kids Socks">Kids Socks</option>
+                          </>
+                        )}
+                        {formData.productType === 'bags' && (
+                          <>
+                            <option value="Handbags">Handbags</option>
+                            <option value="Backpacks">Backpacks</option>
+                            <option value="Travel Bags">Travel Bags</option>
+                            <option value="School Bags">School Bags</option>
+                          </>
+                        )}
+                        {formData.productType === 'belts' && (
+                          <>
+                            <option value="Gents Belts">Gents Belts</option>
+                            <option value="Ladies Belts">Ladies Belts</option>
+                            <option value="Kids Belts">Kids Belts</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Color *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.color}
+                        onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Brand *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.brand}
+                        onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'variants' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Stock & Variants</h3>
+                    
+                    {(formData.productType === 'shoes' || formData.productType === 'socks' || formData.productType === 'belts') && formData.category && (
+                      <div>
+                        <h4 className="text-md font-medium text-gray-700 mb-3">
+                          {getVariantLabel()} Stock for {formData.category}
+                        </h4>
+                        <div className="space-y-3">
+                          {getSizeOptions().map(size => (
+                            <div key={size} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                              <div className="flex items-center space-x-3">
+                                <span className="font-medium text-gray-700 min-w-[60px]">
+                                  {getVariantLabel()} {size}
+                                </span>
+                                <span className="text-gray-400">→</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={formData.variants[size] || 0}
+                                  onChange={(e) => handleVariantChange(size, parseInt(e.target.value) || 0)}
+                                  className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-center"
+                                  placeholder="0"
+                                />
+                                <span className="text-sm text-gray-500">
+                                  {(formData.variants[size] || 0) === 1 ? 'unit' : 'units'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.productType === 'bags' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Total Stock *
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.totalStock}
+                          onChange={(e) => {
+                            const stock = parseInt(e.target.value) || 0;
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              totalStock: stock,
+                              variants: { 'Single Item': stock }
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-gray-600">
+                          <strong>Total Stock:</strong> {formData.totalStock} units
+                        </p>
+                        {formData.productType !== 'bags' && (
+                          <p className="text-xs text-gray-500">
+                            {Object.entries(formData.variants).filter(([_, qty]) => qty > 0).length} variants with stock
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'pricing' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Buying Price *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.buyingPrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, buyingPrice: parseFloat(e.target.value) || 0 }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Selling Price *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.sellingPrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, sellingPrice: parseFloat(e.target.value) || 0 }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-600">Profit per unit:</p>
+                        <p className="font-semibold text-green-600">
+                          ${(formData.sellingPrice - formData.buyingPrice).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Profit margin:</p>
+                        <p className="font-semibold text-blue-600">
+                          {formData.sellingPrice > 0 
+                            ? (((formData.sellingPrice - formData.buyingPrice) / formData.sellingPrice) * 100).toFixed(1)
+                            : 0}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Total potential profit:</p>
+                        <p className="font-semibold text-purple-600">
+                          ${((formData.sellingPrice - formData.buyingPrice) * formData.totalStock).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t mt-8">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={!isFormValid}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  disabled={!isFormValid()}
+                  className={`w-full sm:w-auto px-6 py-2 rounded-md transition-colors ${
+                    isFormValid()
+                      ? 'bg-purple-600 text-white hover:bg-purple-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   {product ? 'Update Product' : 'Add Product'}
                 </button>
-                {!isFormValid && (
-                  <p className="text-sm text-red-600 mt-2">
-                    Please complete all sections: 
-                    {!isBasicDetailsComplete && ' Basic Details'}
-                    {!isVariantsComplete && ' Stock & Variants'}
-                    {!isPricingComplete && ' Pricing'}
-                  </p>
-                )}
               </div>
             </form>
           </div>
@@ -412,6 +479,4 @@ const AddEditProduct: React.FC<AddEditProductProps> = ({
       </div>
     </div>
   );
-};
-
-export default AddEditProduct;
+}

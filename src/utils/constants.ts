@@ -7,14 +7,31 @@ export const PRODUCT_CATEGORIES = {
 
 export const VARIANT_OPTIONS = {
   shoes: {
-    'Ladies Shoes': ['4', '5', '6', '7', '8', '9', '10'],
+    'Ladies Shoes': ['4', '5', '6', '7', '8', '9'],
     'Gents Shoes': ['5', '6', '7', '8', '9', '10', '11'],
-    'Kids Shoes': ['8', '9', '10', '11', '12', '13', '1', '2', '3', '4']
+    'Kids Shoes': ['06', '07', '08', '09', '10', '11', '12', '13', '01', '02', '03', '04', '05']
   },
-  socks: ['Free Size', 'Small', 'Medium', 'Large', 'XL'],
+  socks: ['Small', 'Medium', 'Large'],
   bags: ['Single Item'],
-  belts: ['28', '30', '32', '34', '36', '38', '40', '42']
+  belts: ['28', '30', '32', '34', '36', '38']
 };
+
+export const PRODUCT_TYPES = [
+  { value: 'shoes', label: 'Shoes', icon: '👟' },
+  { value: 'socks', label: 'Socks', icon: '🧦' },
+  { value: 'bags', label: 'Bags', icon: '👜' },
+  { value: 'belts', label: 'Belts', icon: '👔' }
+];
+
+export const SHOE_SIZES = [
+  ...VARIANT_OPTIONS.shoes['Ladies Shoes'],
+  ...VARIANT_OPTIONS.shoes['Gents Shoes'],
+  ...VARIANT_OPTIONS.shoes['Kids Shoes']
+].filter((size, index, array) => array.indexOf(size) === index).sort((a, b) => {
+  const numA = parseInt(a);
+  const numB = parseInt(b);
+  return numA - numB;
+});
 
 export const NAVIGATION_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊', href: 'dashboard' },

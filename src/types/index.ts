@@ -43,4 +43,17 @@ export interface DashboardMetrics {
   profitMargin: number;
 }
 
+export interface ProductFormData {
+  productType: 'shoes' | 'socks' | 'bags' | 'belts';
+  name: string;
+  articleNumber: string;
+  category: string;
+  color: string;
+  brand: string;
+  variants: Record<string, number>;
+  buyingPrice: number;
+  sellingPrice: number;
+  totalStock: number;
+}
+
 export type PageType = 'dashboard' | 'all-products' | 'shoes' | 'socks' | 'bags' | 'belts' | 'sales-entry' | 'reports' | 'settings';
